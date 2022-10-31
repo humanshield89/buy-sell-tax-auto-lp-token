@@ -336,6 +336,8 @@ describe("Tax Tests", function () {
       exemptFromMaxWallet,
     ] = await ethers.getSigners();
 
+    await expect(this.token.connect(alice).setTaxEnabled(false)).to.be.revertedWith("AccessControl: caller is not an admin");
+
     await this.token.setTaxEnabled(false);
 
     expect(await this.token.taxEnabled()).to.be.equal(false);
@@ -367,5 +369,160 @@ describe("Tax Tests", function () {
     const balanceAfter = await this.token.balanceOf(await this.token.lpPair());
 
     expect(balanceAfter.sub(reservesOfToken)).to.be.equal(50n * 10n ** 18n);
+  });
+
+  it('should change the fee only by admin', async function (){
+    const [
+      owner,
+      admin,
+      alice,
+      bob,
+      carl,
+      exemptFromTax,
+      exemptFromMaxTx,
+      exemptFromMaxWallet,
+    ] = await ethers.getSigners();
+    /*    uint64 _buyFee,
+        uint64 _marketingFee,
+        uint128 _adminFee
+        */
+    await expect(this.token.connect(alice).setFees(900, 450, 450)).to.be.revertedWith("AccessControl: caller is not an admin");
+
+    await this.token.setFees(900, 450, 450);
+
+    /*
+    uint64 BuyFee; // 8
+    uint64 marketingFee; // 8 bytes
+    uint128 adminFee; // bytes
+    */
+    const fees = await this.token.fees();
+
+    expect(fees.BuyFee).to.be.equal(900);
+    expect(fees.marketingFee).to.be.equal(450);
+    expect(fees.adminFee).to.be.equal(450);
+  });
+
+
+  it("should pay new tax when tax is enabled", async function () {
+    const [
+      owner,
+      admin,
+      alice,
+      bob,
+      carl,
+      exemptFromTax,
+      exemptFromMaxTx,
+      exemptFromMaxWallet,
+    ] = await ethers.getSigners();
+
+    await this.token.setTaxEnabled(true);
+
+    expect(await this.token.taxEnabled()).to.be.equal(true);
+
+    const reservesOfToken = await this.token.balanceOf(
+      await this.token.lpPair()
+    );
+    const reservesWeth = await this.weth.balanceOf(await this.token.lpPair());
+
+    const amountOut = await this.router.getAmountOut(
+      50n * 10n ** 18n,
+      reservesOfToken,
+      reservesWeth
+    );
+
+    await this.token
+      .connect(alice)
+      .approve(this.router.address, 50n * 10n ** 18n);
+    await this.router
+      .connect(alice)
+      .swapExactTokensForETHSupportingFeeOnTransferTokens(
+        50n * 10n ** 18n,
+        0,
+        [this.token.address, this.weth.address],
+        alice.address,
+        "999999999999999"
+      );
+
+    const balanceAfter = await this.token.balanceOf(await this.token.lpPair());
+
+    expect(balanceAfter.sub(reservesOfToken)).to.be.equal(50n * 10n ** 18n * (10000n - 900n) / 10000n);
+  });
+
+  it('sets swapp enabled only by admin', async function () {
+    const [
+      owner,
+      admin,
+      alice,
+      bob,
+      carl,
+      exemptFromTax,
+      exemptFromMaxTx,
+      exemptFromMaxWallet,
+    ] = await ethers.getSigners();
+
+    await expect(this.token.connect(alice).setSwapEnabled(false)).to.be.revertedWith("AccessControl: caller is not an admin");
+
+    await this.token.setSwapEnabled(false);
+
+    expect(await this.token.isSwapEnabled()).to.be.equal(false);
+  });
+
+  it('should not proccess reserves', async function () {
+    const [
+      owner,
+      admin,
+      alice,
+      bob,
+      carl,
+      exemptFromTax,
+      exemptFromMaxTx,
+      exemptFromMaxWallet,
+    ] = await ethers.getSigners();
+
+    const liquidityReseves = await this.token.liquidityReseves();
+    const adminReserves = await this.token.adminReserves();
+    const marketingReserves = await this.token.marketingReserves();
+
+    await this.token.connect(bob).transfer(alice.address, 100n * 10n ** 18n);
+
+    const liquidityResevesAfter = await this.token.liquidityReseves();
+    const adminReservesAfter = await this.token.adminReserves();
+    const marketingReservesAfter = await this.token.marketingReserves();
+
+    expect(liquidityResevesAfter).to.be.equal(liquidityReseves);
+    expect(adminReservesAfter).to.be.equal(adminReserves);
+    expect(marketingReservesAfter).to.be.equal(marketingReserves);
+
+    await this.token.processReserves();
+
+    const liquidityResevesAfter2 = await this.token.liquidityReseves();
+    const adminReservesAfter2 = await this.token.adminReserves();
+    const marketingReservesAfter2 = await this.token.marketingReserves();
+
+    expect(liquidityResevesAfter2).to.be.equal(0);
+    expect(adminReservesAfter2).to.be.equal(0);
+    expect(marketingReservesAfter2).to.be.equal(0);
+  });
+
+  it('sets the admin Wallet', async function () {
+    const [
+        owner,
+        admin,
+        alice,
+        bob,
+        carl,
+        exemptFromTax,
+        exemptFromMaxTx,
+        exemptFromMaxWallet,marketing
+      ] = await ethers.getSigners();
+
+      await expect(this.token.connect(alice).setAdminWallet(admin.address)).to.be.revertedWith("AccessControl: caller is not an admin");
+      await expect(this.token.connect(alice).setMarketingWallet(marketing.address)).to.be.revertedWith("AccessControl: caller is not an admin");
+
+      await this.token.connect(owner).setAdminWallet(admin.address);
+      await this.token.connect(owner).setMarketingWallet(marketing.address);
+
+      expect(admin.address).equal(await this.token.adminWallet());
+      expect(marketing.address).equal(await this.token.marketingWallet());
   });
 });

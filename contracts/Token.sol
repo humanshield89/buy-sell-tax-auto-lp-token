@@ -22,7 +22,7 @@ contract Token is TradeManagedToken {
     address public immutable lpPair;
     IRouter public immutable router;
 
-    Fees fees = Fees(BUY_FEE, MARKETING_SELL_FEE, ADMIN_SELL_FEE);
+    Fees public fees = Fees(BUY_FEE, MARKETING_SELL_FEE, ADMIN_SELL_FEE);
 
     mapping(address => bool) public lpPairList;
 
@@ -33,6 +33,7 @@ contract Token is TradeManagedToken {
     uint256 public marketingReserves;
 
     address public adminWallet = ADMIN_WALLET;
+
     address public marketingWallet = MARKETING_WALLET;
 
     bool public isSwapEnabled = true;
@@ -82,6 +83,16 @@ contract Token is TradeManagedToken {
         isSwapEnabled = _isSwapEnabled;
     }
 
+    function setAdminWallet(address _newAdminWallet) external onlyAdmin {
+        require(_newAdminWallet != address(0));
+        adminWallet = _newAdminWallet;
+    }
+
+    function setMarketingWallet(address _newMarketingWallet) external onlyAdmin {
+        require(_newMarketingWallet != address(0));
+        marketingWallet = _newMarketingWallet;
+    }
+
     function setFees(
         uint64 _buyFee,
         uint64 _marketingFee,
@@ -101,7 +112,7 @@ contract Token is TradeManagedToken {
         isExcludedFromFee[_account] = _exempt;
     }
 
-    function setTaxEnabled(bool _taxEnabled) external onlyOwner {
+    function setTaxEnabled(bool _taxEnabled) external onlyAdmin {
         taxEnabled = _taxEnabled;
     }
 

@@ -18,6 +18,10 @@ describe("BlacklistToken", function () {
     const [owner, blacklisted1, blacklisted2, notBlackListed] =
       await ethers.getSigners();
 
+
+    await expect(this.blacklistToken.connect(blacklisted2).addToBlacklist(blacklisted1.address))
+    .to.be.revertedWith("AccessControl: caller is not an admin");
+
     await this.blacklistToken.addToBlacklist(blacklisted1.address);
 
     expect(
@@ -45,6 +49,9 @@ describe("BlacklistToken", function () {
   it("it can remove a blacklisted user", async function () {
     const [owner, blacklisted1, blacklisted2, notBlackListed] =
       await ethers.getSigners();
+
+      await expect(this.blacklistToken.connect(blacklisted2).removeFromBlacklist(blacklisted1.address))
+      .to.be.revertedWith("AccessControl: caller is not an admin");
 
     await this.blacklistToken.removeFromBlacklist(blacklisted1.address);
 
